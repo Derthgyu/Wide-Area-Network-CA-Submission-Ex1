@@ -1,0 +1,68 @@
+
+Name: Nzeugang Ngoptat Joël Daniel 
+Matricule : ICTU20241389
+
+EXERCISE 1: Multi-Site WAN Extension with Redundant Paths
+
+1. The goal is to extend the basic linear WAN into a triangular topology with redundancy:
+	• HQ (n0) connects to Branch (n1) and DC (n2)
+	• Branch (n1) connects to HQ (n0) and DC (n2)
+	• DC (n2) connects to HQ (n0) and Branch (n1)
+This provides two possible paths between any two sites.
+SOLUTION :
+Create Additional Links (Link 3: DC)
+This snippet must be inserted after the existing link2Devices installation
+
+Code:
+// Link3 : n0-n2 (network 3)
+NodeCintainer link3Node(n0,n2);
+NetDeviceContainer link3Devices = p2p.Install(link3Nodes);
+
+2. Static Routing Table Analysis
+Each node must have two routes to the other network:
+	• Primary (direct)
+	• Backup (via third node)
+
+HQ (n0) routes to DC
+staticN0->AddNetworkRouteTo(”10.1.2.0”,”255.255.255.0”,”10.1.3.2”,1); // primary
+staticN0->AddNetworkRouteTo(”10.1.2.0”,”255.255.255.0”,”10.1.1.2”,2); // backup via Branch
+
+Explanation
+	• If the direct link fails, traffic automatically follows the backup path.
+•	 Symmetric routes must also be added on n1 and n2.
+
+3. Path Failure Simulation
+Interpretation
+Simulate failure of the HQ–DC primary link at t = 4s and verify traffic continues via Branch.
+
+Code:
+
+Simulator::Schedule(Seconds(4.0),
+  &Ipv4::SetDown,
+  n0->GetObject<Ipv4>(),
+  n0->GetObject<Ipv4>()->GetInterfaceForDevice(dev02.Get(0)));
+
+Verification
+	• Use NetAnim → traffic shifts path
+	• Use FlowMonitor → packets still delivered
+
+4. Scalability Analysis
+Interpretation
+
+Static routing does not scale.
+
+For N nodes:
+Static routes required = N × (N − 1)
+Example:
+	• 10 sites → 90 static routes
+Scalable Solution
+Use dynamic routing (OSPF).
+NS-3 Helpers
+Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+
+5. Business Continuity Justification
+Static routing with redundancy provides:
+	• Improved reliability (failover paths)
+	• Load-balancing potential
+	• Deterministic troubleshooting
+	• Lower cost than dynamic protocols in small WANs
